@@ -3,7 +3,13 @@ import os
 import json
 from groq import Client
 
-client = Client(api_key=os.environ.get("GROQ_API_KEY"))
+
+def get_client():
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY is not set")
+    return Client(api_key=api_key)
+
 
 # Simple classification instructions
 SYSTEM_PROMPT = """
@@ -67,7 +73,7 @@ Keywords:
 """
 
 
-def call_llm_batch(keywords):
+def call_llm_batch(client, keywords):
     """Send ONE batch of keywords to Groq, return a list of dicts."""
     user_prompt = BATCH_TEMPLATE.format(
         keywords_json=json.dumps(keywords, ensure_ascii=False)
@@ -97,13 +103,14 @@ def classify_keywords_batchwise(keywords, batch_size):
     """
     Break keywords into batches, call the LLM, and combine results.
     """
+    client = get_client()
     final_mapping = {}
 
     for i in range(0, len(keywords), batch_size):
         batch = keywords[i : i + batch_size]
         print(f"Processing batch {i//batch_size + 1} ...")
 
-        results = call_llm_batch(batch)
+        results = call_llm_batch(client, batch)
         for item in results:
             k = item.get("keyword")
             g = item.get("genre")
