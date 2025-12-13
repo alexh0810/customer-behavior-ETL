@@ -1,0 +1,6 @@
+base_path: '/Users/alex/BigData-2025/customer-behavior-etl/data/log_search/log_search'
+output_path: '/Users/alex/BigData-2025/customer-behavior-etl/output/final_with_genre'
+
+max_keywords: 50
+batch_size: 30
+write_output: false
