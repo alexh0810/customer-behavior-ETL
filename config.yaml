@@ -1,6 +1,33 @@
-base_path: '/Users/alex/BigData-2025/customer-behavior-etl/data/log_search/log_search'
-output_path: '/Users/alex/BigData-2025/customer-behavior-etl/output/final_with_genre'
+# ============================================================
+# Search Log ETL Configuration
+# ============================================================
+search:
+  base_path: '/Users/alex/BigData-2025/customer-behavior-etl/data/log_search/log_search'
+  output_path: '/Users/alex/BigData-2025/customer-behavior-etl/output/final_with_genre'
+  max_keywords: 50
+  batch_size: 30
+  write_output: false
 
-max_keywords: 50
-batch_size: 30
-write_output: false
+# ============================================================
+# Content Interactions ETL Configuration (Daily JSON Logs)
+# ============================================================
+content_interactions:
+  base_path: '/Users/alex/BigData-2025/customer-behavior-etl/data/log_content'
+  output_path: '/Users/alex/BigData-2025/customer-behavior-etl/output/content_interactions'
+  start_date: '20220401' # Format: YYYYMMDD
+  end_date: '20220403' # Format: YYYYMMDD
+  write_output: false
+  categories:
+    - 'Giải Trí' # Entertainment (RELAX)
+    - 'Phim Truyện' # Movies/Series (VOD, FIMS, BHD, DANET)
+    - 'Thiếu Nhi' # Children (CHILD)
+    - 'Thể Thao' # Sports (SPORT)
+    - 'Truyền Hình' # TV/Broadcast (CHANNEL, DSHD, KPLUS)
+
+# ============================================================
+# Spark Configuration (shared)
+# ============================================================
+spark:
+  app_name: 'CustomerBehaviorETL'
+  master: 'local[*]' # Change to cluster config for production
+  log_level: 'WARN'

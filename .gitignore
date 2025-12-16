@@ -12,6 +12,8 @@ __pycache__/
 # -----------------------------
 data/log_search/
 data/log_search/**
+data/log_content/
+data/log_content/** 
 
 # Keep sample data
 !data/sample/
