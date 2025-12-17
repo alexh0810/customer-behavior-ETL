@@ -1,4 +1,4 @@
-\#!/usr/bin/env python3
+#!/usr/bin/env python3
 import os
 import sys
 import yaml
@@ -108,13 +108,15 @@ def join_and_label(final_df, mapping_df):
         .join(july_map, "most_search_July", "left")
         .withColumn(
             "Trending_Type",
-            when(col("category_june") == col("category_july"), lit("Unchanged"))
-            .otherwise(lit("Changed")),
+            when(
+                col("category_june") == col("category_july"), lit("Unchanged")
+            ).otherwise(lit("Changed")),
         )
         .withColumn(
             "Previous",
-            when(col("category_june") == col("category_july"), lit("Unchanged"))
-            .otherwise(concat_ws("-", col("category_june"), col("category_july"))),
+            when(
+                col("category_june") == col("category_july"), lit("Unchanged")
+            ).otherwise(concat_ws("-", col("category_june"), col("category_july"))),
         )
     )
 
@@ -159,9 +161,7 @@ def main():
 
     final_df = june_top.join(july_top, "user_id", "inner")
 
-    keywords, all_keywords_df = compute_top_keywords_list(
-        final_df, MAX_KEYWORDS
-    )
+    keywords, all_keywords_df = compute_top_keywords_list(final_df, MAX_KEYWORDS)
 
     if not keywords:
         logger.warning("No keywords found")
@@ -169,16 +169,21 @@ def main():
         sys.exit(0)
 
     mapping = classify_keywords_batchwise(keywords, BATCH_SIZE)
+    logger.info(f"Classified {len(mapping)} / {len(keywords)} keywords")
+
+    if not mapping:
+        logger.warning("LLM returned no valid keyword classifications. Skipping join.")
+        spark.stop()
+        sys.exit(0)
 
     mapping_df = build_mapping_df(spark, mapping)
     result = join_and_label(final_df, mapping_df)
 
     result_filtered = result.filter(
-        col("category_june").isNotNull()
-        & col("category_july").isNotNull()
+        col("category_june").isNotNull() & col("category_july").isNotNull()
     )
 
-    result_filtered.show(20, truncate=False)
+    result_filtered.show(20)
 
     if WRITE_OUTPUT:
         result_filtered.write.mode("overwrite").parquet(OUTPUT_PATH)

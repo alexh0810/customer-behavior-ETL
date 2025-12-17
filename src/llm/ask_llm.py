@@ -1,6 +1,7 @@
 # ask_llm.py
 import os
 import json
+import re
 from groq import Client
 
 
@@ -13,64 +14,156 @@ def get_client():
 
 # Simple classification instructions
 SYSTEM_PROMPT = """
-Bạn là trợ lý phân loại từ khoá cho nền tảng xem phim/series.
+Bạn là trợ lý phân loại từ khoá cho nền tảng xem phim / series.
 
-Nhiệm vụ:
-- Phân loại MỖI TỪ KHOÁ (nếu là tên phim/series hợp lệ) vào đúng một trong các thể loại:
-  • C-DRAMA   → Phim/series Trung Quốc
-  • K-DRAMA   → Phim/series Hàn Quốc
-  • Action    → Phim hành động, tội phạm, siêu anh hùng, giật gân
-  • Horror    → Phim kinh dị, ma, tâm linh, zombie
+MỤC TIÊU:
+Phân loại từ khoá tìm kiếm thành thể loại phim/series CHÍNH XÁC và NHẤT QUÁN.
+Ưu tiên phân loại đúng hơn là phân loại nhiều.
+
+CÁC THỂ LOẠI HỢP LỆ (CHỈ 1):
+- C-DRAMA   → Phim / series Trung Quốc
+- K-DRAMA   → Phim / series Hàn Quốc
+- Action    → Phim hành động, tội phạm, siêu anh hùng, anime hành động
+- Horror    → Phim kinh dị, ma, tâm linh, giết người, rùng rợn
+
+⚠️ QUY TẮC ƯU TIÊN (RẤT QUAN TRỌNG):
+1) Nếu từ khoá là phim/series Trung Quốc → LUÔN là C-DRAMA
+2) Nếu từ khoá là phim/series Hàn Quốc → LUÔN là K-DRAMA
+   (KỂ CẢ khi có yếu tố hành động, tâm linh, siêu nhiên)
+
+3) CHỈ dùng Action hoặc Horror khi:
+   - KHÔNG phải phim Trung / Hàn
+   - Và thể loại đó là ĐẶC TRƯNG CHÍNH
+
+❌ KHÔNG ĐƯỢC phân loại Horror chỉ vì:
+- Có yếu tố huyền huyễn / fantasy
+- Có ma mị nhẹ / tâm linh nhẹ
+- Là phim cổ trang / ngôn tình
+
+❌ KHÔNG ĐƯỢC phân loại nếu từ khoá là:
+- Kênh truyền hình (vd: vtv, hbo, vtv6)
+- Tên diễn viên / đạo diễn
+- Thể loại chung chung (vd: phim hay, action movie)
+- Từ khoá không rõ nghĩa
 
 QUY TẮC NHẬN DIỆN:
-1) Từ khoá chỉ gồm tiếng Việt hoặc tiếng Anh.  
-   Bạn cần nhận diện tiêu đề phim KHÔNG phân biệt:
-   - chữ hoa/chữ thường (case-insensitive)
-   - cách viết có dấu, không dấu, hoặc mixed dấu (accent-insensitive)
+- Không phân biệt hoa/thường
+- Không phân biệt có dấu / không dấu
+- Cho phép viết sai dấu / thiếu dấu
+- Giữ nguyên keyword gốc trong output
 
-   Ví dụ: “Hậu Duệ Mặt Trời”, “Hau Due Mat Troi”, “Hậu Due Mat Troi” → đều được coi là hợp lệ.
+MỨC ĐỘ CHẮC CHẮN:
+- Nếu bạn KHÁ CHẮC CHẮN (≈70–80%) → CÓ THỂ phân loại
+- Nếu KHÔNG CHẮC → BỎ QUA (KHÔNG đoán)
 
-2) Nhận diện các tiêu đề phim/series tiếng Việt hoặc tiếng Anh ngay cả khi viết thiếu dấu, sai dấu, hoặc viết không chuẩn.
+OUTPUT (BẮT BUỘC):
+- CHỈ trả về DUY NHẤT MỘT JSON ARRAY
+- KHÔNG giải thích
+- KHÔNG markdown
+- Mỗi keyword chỉ xuất hiện 1 lần
 
-3) Giữ nguyên nguyên văn từ khoá (sau khi trim) khi đưa vào trường "keyword".
+ĐỊNH DẠNG:
+[
+  { "keyword": "<string>", "genre": "C-DRAMA | K-DRAMA | Action | Horror" }
+]
 
-QUY TẮC PHÂN LOẠI:
-4) Chỉ phân loại khi bạn THỰC SỰ CHẮC CHẮN về xuất xứ hoặc thể loại của phim.
-   - Nếu không chắc → BỎ QUA (không đoán, không suy diễn, không hallucinate).
+Nếu không có kết quả hợp lệ → [].
 
-XỬ LÝ INPUT:
-5) Input là danh sách chuỗi. Nếu phần tử không phải chuỗi → bỏ qua.
-6) Nếu từ khoá trùng lặp → chỉ giữ lần đầu.
-7) Kết quả phải theo đúng thứ tự xuất hiện trong input.
-
-ĐỊNH DẠNG ĐẦU RA:
-Luôn trả về DUY NHẤT MỘT JSON ARRAY.
-Mỗi phần tử có dạng:
-  {"keyword": "<string>", "genre": "C-DRAMA | K-DRAMA | Action | Horror"}
-
-Nếu không có từ khoá hợp lệ → trả về [].
 """
 
 # Prompt for batches
 BATCH_TEMPLATE = """
-Phân loại các từ khoá sau đây theo đúng quy tắc:
-
-- Từ khoá chỉ gồm tiếng Việt hoặc tiếng Anh, có thể viết có dấu, không dấu hoặc mixed.
-- Không phân biệt chữ hoa/chữ thường.
-- Chỉ phân loại nếu từ khoá là tên phim/series và bạn CHẮC CHẮN về thể loại hoặc xuất xứ.
-- Nếu không chắc → BỎ QUA (không đoán, không suy diễn).
-- Chỉ trả về DUY NHẤT MỘT mảng JSON dạng:
-  [
-    {{ "keyword": "<string>", "genre": "C-DRAMA | K-DRAMA | Action | Horror" }},
-    ...
-  ]
-
-Bỏ qua những từ khoá không rõ nghĩa hoặc không thể phân loại.
+Phân loại các từ khoá sau theo đúng quy tắc đã nêu.
 
 Keywords:
 {keywords_json}
 
 """
+
+
+def extract_json_array(text):
+    """
+    Extract JSON array from text, handling incomplete arrays
+    """
+    # Try to find array start
+    start = text.find("[")
+    if start == -1:
+        return None
+
+    # Try to find array end
+    end = text.rfind("]")
+
+    if end == -1:
+        # Array is incomplete - try to salvage what we have
+        # Find last complete object
+        last_complete = text.rfind("}")
+        if last_complete > start:
+            # Try to close the array
+            text = text[: last_complete + 1] + "\n]"
+            end = len(text) - 1
+        else:
+            return None
+
+    return text[start : end + 1]
+
+
+def safe_parse_json_array(text):
+    """
+    Safely parse JSON array with multiple fallback strategies
+    """
+    if not text or not text.strip():
+        return []
+
+    # Strategy 1: Try direct parse
+    try:
+        result = json.loads(text.strip())
+        if isinstance(result, list):
+            return result
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 2: Extract JSON array substring
+    json_str = extract_json_array(text)
+    if json_str:
+        try:
+            result = json.loads(json_str)
+            if isinstance(result, list):
+                return result
+        except json.JSONDecodeError:
+            pass
+
+    # Strategy 3: Try to fix common JSON issues
+    if json_str:
+        # Remove trailing commas before closing braces/brackets
+        fixed = re.sub(r",(\s*[}\]])", r"\1", json_str)
+        try:
+            result = json.loads(fixed)
+            if isinstance(result, list):
+                return result
+        except json.JSONDecodeError:
+            pass
+
+    # Strategy 4: Parse line by line for individual objects
+    results = []
+    for line in text.split("\n"):
+        line = line.strip()
+        if line.startswith("{") and line.endswith("},"):
+            line = line.rstrip(",")
+        if line.startswith("{") and line.endswith("}"):
+            try:
+                obj = json.loads(line)
+                if isinstance(obj, dict) and "keyword" in obj and "genre" in obj:
+                    results.append(obj)
+            except json.JSONDecodeError:
+                continue
+
+    if results:
+        return results
+
+    # Last resort: return empty list instead of raising error
+    print(f"WARNING: Could not parse LLM response. Returning empty list.")
+    print(f"Response preview: {text[:500]}...")
+    return []
 
 
 def call_llm_batch(client, keywords):
@@ -79,24 +172,36 @@ def call_llm_batch(client, keywords):
         keywords_json=json.dumps(keywords, ensure_ascii=False)
     )
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",  # You can change to your preferred model
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0,
-    )
-
-    text = response.choices[0].message.content.strip()
-    # Try to parse response
     try:
-        return json.loads(text)
-    except:
-        # Fallback: try to find the JSON array inside the text
-        start = text.find("[")
-        end = text.rfind("]")
-        return json.loads(text[start : end + 1])
+        response = client.chat.completions.create(
+            model="qwen/qwen3-32b",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0,
+            max_tokens=8000,  # Increased to handle larger responses
+        )
+
+        text = response.choices[0].message.content.strip()
+
+        # Use safe parsing
+        results = safe_parse_json_array(text)
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_results = []
+        for item in results:
+            keyword = item.get("keyword")
+            if keyword and keyword not in seen:
+                seen.add(keyword)
+                unique_results.append(item)
+
+        return unique_results
+
+    except Exception as e:
+        print(f"ERROR calling LLM: {e}")
+        return []
 
 
 def classify_keywords_batchwise(keywords, batch_size):
@@ -108,9 +213,11 @@ def classify_keywords_batchwise(keywords, batch_size):
 
     for i in range(0, len(keywords), batch_size):
         batch = keywords[i : i + batch_size]
-        print(f"Processing batch {i//batch_size + 1} ...")
+        print(f"Processing batch {i//batch_size + 1} ({len(batch)} keywords)...")
 
         results = call_llm_batch(client, batch)
+        print(f"  Received {len(results)} classifications")
+
         for item in results:
             k = item.get("keyword")
             g = item.get("genre")

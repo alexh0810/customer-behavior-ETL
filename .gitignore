@@ -8,22 +8,24 @@ __pycache__/
 .env
 
 # -----------------------------
-# Raw data (do not commit)
+# Data (do not commit generated or raw data)
 # -----------------------------
-data/log_search/
-data/log_search/**
-data/log_content/
-data/log_content/** 
+data/*
+output/*
 
-# Keep sample data
+# Keep sample data for reference
 !data/sample/
 !data/sample/**
 
 # -----------------------------
-# Spark output
+# DuckDB
 # -----------------------------
-output/
-output/**
+*.duckdb
+
+# -----------------------------
+# Logs
+# -----------------------------
+*.log
 
 # -----------------------------
 # OS / Editor
@@ -31,8 +33,3 @@ output/**
 .DS_Store
 .vscode/
 .idea/
-
-# -----------------------------
-# Logs
-# -----------------------------
-*.log

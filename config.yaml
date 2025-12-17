@@ -3,10 +3,10 @@
 # ============================================================
 search:
   base_path: '/Users/alex/BigData-2025/customer-behavior-etl/data/log_search/log_search'
-  output_path: '/Users/alex/BigData-2025/customer-behavior-etl/output/final_with_genre'
-  max_keywords: 50
-  batch_size: 30
-  write_output: false
+  output_path: '/Users/alex/BigData-2025/customer-behavior-etl/output/search_interactions'
+  max_keywords: 1000
+  batch_size: 20
+  write_output: true
 
 # ============================================================
 # Content Interactions ETL Configuration (Daily JSON Logs)
@@ -15,8 +15,8 @@ content_interactions:
   base_path: '/Users/alex/BigData-2025/customer-behavior-etl/data/log_content'
   output_path: '/Users/alex/BigData-2025/customer-behavior-etl/output/content_interactions'
   start_date: '20220401' # Format: YYYYMMDD
-  end_date: '20220403' # Format: YYYYMMDD
-  write_output: false
+  end_date: '20220420' # Format: YYYYMMDD
+  write_output: true
   categories:
     - 'Giải Trí' # Entertainment (RELAX)
     - 'Phim Truyện' # Movies/Series (VOD, FIMS, BHD, DANET)
