@@ -1,190 +1,195 @@
-# Customer Behavior ETL — Search Trends & Genre Classification
+# Customer Behavior Analytics Pipeline
 
-This project analyzes user search logs from June and July, extracts each user’s **top search keyword per month**, classifies these keywords into **content genres using an LLM**, and identifies whether the user's search preference **changed** between months.
+### Search Trends, Content Engagement & Analytics Marts
 
-It is designed to demonstrate practical **data engineering** skills and best practices.
+An end-to-end analytics engineering project that processes user search behavior and content interaction data, models analytics marts in DuckDB, and exposes insights through SQL, visualizations, and a Streamlit dashboard.
 
----
+## 1. Problem
 
-# 🚀 Features
+Key questions to answer:
 
-### ✔ Scalable ETL with PySpark
+- How stable user interests are over time
+- Where and how interests shift between categories
+- How engaged users are based on actual activity, not assumptions
 
-Processes large parquet datasets with user-level aggregations.
+## 2. Solution Overview
 
-### ✔ LLM-based keyword classification
+This project implements a complete analytics workflow:
 
-Uses Groq LLM to classify search keywords into genres (Action, Horror, K-Drama, etc.).
+- PySpark ETL for scalable, incremental processing
+- LLM-based keyword classification to infer search intent
+- DuckDB analytics warehouse for fast, reproducible querying
+- SQL analytics views and marts as the single source of truth
+- Static Python visualizations for documented outputs
+- Streamlit dashboard for interactive exploration
 
-### ✔ Trend analysis
+All business logic is defined in SQL marts. Dashboards and charts are read-only consumers.
 
-Detects whether users stayed in the same genre or switched preferences.
-
-### ✔ Professional engineering practices
-
-- Config-driven design (`config.yaml`)
-- Pretty logging (timestamped, severity-level)
-- Modular folder structure
-- Unit tests for utilities + LLM mocking
-- Docker-ready
-- Fully reproducible local run
-
----
-
-# 📁 Project Structure
+## 3. Architecture
 
 ```
+Raw Logs (Search & Content)
+        │
+        ▼
+PySpark ETL (incremental)
+        │
+        ▼
+DuckDB Warehouse
+  ├── fact_search_behavior
+  ├── fact_content_interactions
+  ├── analytics_* views
+  └── analytics marts
+        │
+        ▼
+Visualizations & Streamlit Dashboard
+```
+
+### 4. Key features
+
+✔ Scalable ETL with PySpark
+
+- User-level aggregations
+- Incremental processing by date
+- Config-driven via config.yaml
+
+✔ LLM-based Search Classification
+
+- Groq LLM used to classify search keywords into genres
+- Robust parsing and LLM mocking in tests
+
+✔ Analytics Warehouse & Marts
+
+- DuckDB used as a lightweight analytics warehouse
+- SQL marts define metrics such as:
+
+  - search stability
+  - interest transitions
+  - engagement segmentation
+
+✔ Correct Engagement Metrics
+
+- ActiveDays computed from real activity
+- Engagement tiers derived from observed usage
+
+✔ Multiple Output Layers
+
+- Static charts (PNG)
+- Interactive Streamlit dashboard
+- SQL marts reusable by BI tools
+
+### 5. Documented Outputs
+
+This project produces documented, reproducible analytics outputs.
+
+#### Static results & explanations
+
+📊 See: `docs/OUTPUT.md`
+
+Includes:
+
+- final charts
+- SQL queries used
+- interpretation of results
+
+#### Interactive exploration
+
+A Streamlit dashboard provides interactive access to the same analytics marts.
+
+### 6. Project Structure
+
+```bash
 customer-behavior-etl/
-│
-├── config.yaml # Pipeline settings (paths, max keywords, batch size, etc.)
-│
+├── config.yaml
 ├── src/
-│ ├── etl/ETL_log_search.py # Main ETL pipeline (Spark)
-│ ├── llm/ask_llm.py # LLM batch classifier (Groq)
-│ └── utils/parse_helpers.py # Robust JSON extraction utilities
-│
-├── data/
-│ ├── log_search/ # Raw data (not stored in repo)
-│ └── sample/ # Small anonymized dataset for demo runs
-│
-├── scripts/
-│ └── make_sample_pandas.py # Creates demo sample data
-│
+│   ├── etl/                 # Spark ETL pipelines
+│   ├── llm/                 # LLM classification logic
+│   ├── warehouse/           # DuckDB + SQL marts
+│   ├── viz/                 # Static visualization scripts
+│   └── dashboard/           # Streamlit app
+├── docs/                    # OUTPUT.md + charts
 ├── tests/
-│ ├── test_parse_helpers.py
-│ └── test_llm_mock.py
-│
 ├── requirements.txt
 ├── Dockerfile
-├── README.md
-└── .gitignore
+└── README.md
+
 ```
 
----
-
-# ⚙️ Installation
-
-### 1️⃣ Clone the repository
+### 7. Installation
 
 ```bash
 git clone <repo-url>
 cd customer-behavior-etl
-```
 
-2️⃣ Create and activate a virtual environment
-
-macOS / Linux:
-
-```bash
 python3 -m venv .venv
 source .venv/bin/activate
-```
-
-Windows:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-3️⃣ Install dependencies
-
-```bash
 pip install -r requirements.txt
 ```
 
-# 🔧 Configuration
+### 8. Configuration
 
-All settings are stored in config.yaml:
+All pipeline settings are stored in `config.yaml`:
 
 ```yaml
-base_path: 'data/log_search/log_search'
-output_path: 'output/final_with_genre'
+base_path: data/log_search
+output_path: output/
 
 max_keywords: 100
 batch_size: 30
 write_output: false
 ```
 
-Edit this file to:
+### 9. LLM API Setup
 
-- Change data input path
-- Enable output writing
-- Expand number of keywords sent to the LLM
-- Change batch size
+This project uses Groq LLM for keyword classification.
 
-# 🔐 Groq API Key Setup
-
-This project uses Groq LLM to classify search keywords into content genres.
-You must set a Groq API key as an environment variable before running the ETL.
-
-macOS / Linux
+macOS / Linux:
 
 ```bash
 export GROQ_API_KEY="your_groq_api_key_here"
 ```
 
-Windows
+Windows:
 
 ```bash
 setx GROQ_API_KEY "your_groq_api_key_here"
+```
+
+### 10. Running the pipeline
+
+```
+# Run ETL
+python -m src.etl.ETL_log_search
+python -m src.etl.ETL_log_content
+
+# Load data into DuckDB
+python -m src.warehouse.load_parquet
+
+# Create analytics views & marts
+python -m src.warehouse.run_sql
+
+# Generate static charts
+python src/viz/plot_search_stability.py
+python src/viz/plot_interest_change_summary.py
+python src/viz/plot_contract_engagement.py
 
 ```
 
-# ▶️ Running the ETL Pipeline
-
-Once dependencies and config are ready:
+### 11. Running the dashboard
 
 ```bash
-python src/etl/ETL_log_search.py
+PYTHONPATH=. streamlit run src/dashboard/app.py
 ```
 
-This will:
-
-- Load search logs for June & July
-- Compute each user's top keyword in each month
-- Rank the most frequent keywords (Top N)
-- Send keywords to LLM for classification
-- Join predictions back to users
-- Compute Trending_Type (Changed / Unchanged)
-- Print a sample of results
-- Save output (if write_output = true)
-
-# 🧪 Running Tests
+### 12. Testing
 
 ```bash
 pytest -q
 ```
 
-Tests include:
+### Tech Stack
 
-- JSON extraction from messy LLM responses
-- Classification pipeline with LLM mocking
-- Ensuring stability of keyword mapping logic
-- These demonstrate engineering discipline beyond basic scripting.
-
-# 🐳 Running with Docker (optional)
-
-Build the container:
-
-```bash
-docker build -t customer-etl .
-```
-
-Build the container:
-
-```bash
-docker run --rm customer-etl
-```
-
-📊 Example Output:
-
-```
-+--------+-------------------+-------------+-------------------+--------------+-------------+--------------------+
-| user_id| most_search_June  |category_june| most_search_July  |category_july |Trending_Type| Previous           |
-+--------+-------------------+-------------+-------------------+--------------+-------------+--------------------+
-| 12345  | avengers          | Action      | avengers          | Action       | Unchanged   | Unchanged          |
-| 67890  | parasite          | K-DRAMA     | outlast           | Horror       | Changed     | K-DRAMA-Horror     |
-+--------+-------------------+-------------+-------------------+--------------+-------------+--------------------+
-
-```
+- PySpark
+- DuckDB
+- SQL
+- Python (matplotlib, Streamlit)
+- Groq LLM
