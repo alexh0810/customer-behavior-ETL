@@ -4,6 +4,7 @@ Incremental ETL Pipeline for Customer Content Logs
 
 - Processes daily JSON logs one day at a time
 - Aggregates per-contract metrics incrementally
+- Tracks ActiveDays correctly (per active day)
 - Avoids global shuffles and driver OOM
 """
 
@@ -19,8 +20,6 @@ from pyspark.sql.functions import (
     when,
     greatest,
     concat_ws,
-    countDistinct,
-    sum as f_sum,
 )
 
 from src.utils.spark_helpers import create_spark_session
@@ -80,7 +79,11 @@ def process_daily(spark, base_path, date_str):
     logger.info(f"Processing {date_str}")
     df = transform_content_log(spark, path, verbose=False)
 
-    return df.withColumn("Date", lit(date_str))
+    # Mark this contract as active for this day
+    df = df.withColumn("Date", lit(date_str))
+    df = df.withColumn("ActiveDays", lit(1))
+
+    return df
 
 
 def incremental_merge(df_acc, df_day, categories):
@@ -88,19 +91,25 @@ def incremental_merge(df_acc, df_day, categories):
     Merge one day's aggregated data into accumulator safely
     """
     if df_acc is None:
-        return df_day
+        return df_day.select(
+            "Contract",
+            *categories,
+            "TotalDevices",
+            "ActiveDays",
+        )
 
-    # Rename columns to avoid ambiguity
     left = df_acc.select(
         "Contract",
         *[col(c).alias(f"{c}_acc") for c in categories],
         col("TotalDevices").alias("TotalDevices_acc"),
+        col("ActiveDays").alias("ActiveDays_acc"),
     )
 
     right = df_day.select(
         "Contract",
         *[col(c).alias(f"{c}_day") for c in categories],
         col("TotalDevices").alias("TotalDevices_day"),
+        col("ActiveDays").alias("ActiveDays_day"),
     )
 
     joined = left.join(right, "Contract", "outer").na.fill(0)
@@ -115,7 +124,13 @@ def incremental_merge(df_acc, df_day, categories):
         greatest(col("TotalDevices_acc"), col("TotalDevices_day")),
     )
 
-    return joined.select("Contract", *categories, "TotalDevices")
+    # Active days: increment only when present
+    joined = joined.withColumn(
+        "ActiveDays",
+        col("ActiveDays_acc") + col("ActiveDays_day"),
+    )
+
+    return joined.select("Contract", *categories, "TotalDevices", "ActiveDays")
 
 
 # ============================================================
@@ -170,14 +185,10 @@ def main():
     df_final = df_final.withColumn(
         "Taste",
         concat_ws(", ", *[when(col(c) > 0, lit(c)) for c in CATEGORIES]),
-    ).withColumn("Taste", when(col("Taste") == "", "No watch").otherwise(col("Taste")))
-
-    # Active days
-    active_days = df_final.select("Contract").withColumn(
-        "ActiveDays", lit(len(generate_date_list(START_DATE, END_DATE)))
+    ).withColumn(
+        "Taste",
+        when(col("Taste") == "", "No watch").otherwise(col("Taste")),
     )
-
-    df_final = df_final.join(active_days, "Contract", "left")
 
     logger.info(f"Final contract count: {df_final.count()}")
 

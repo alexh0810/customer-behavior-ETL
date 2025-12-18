@@ -4,7 +4,10 @@ CREATE OR REPLACE VIEW mart_interest_change_summary AS
 SELECT
     category_june,
     category_july,
-    trending_type,
+    Trending_Type AS trending_type,
     COUNT(*) AS users
 FROM analytics_search_behavior
-GROUP BY category_june, category_july, trending_type;
+GROUP BY
+    category_june,
+    category_july,
+    Trending_Type;
