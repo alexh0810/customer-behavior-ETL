@@ -1,7 +1,3 @@
-# Project Title
-
-A brief description of what this project does and who it's for
-
 # Analytics Output Report
 
 ## Customer Behavior Analytics Pipeline
@@ -115,7 +111,7 @@ This output segments contracts into Low, Medium, and High engagement tiers based
 
 Engagement is derived from ActiveDays, representing the number of distinct days with content interaction.
 
-**Engagement definition\***
+**Engagement definition**
 | Level | Definition |
 | ------ | ---------------------- |
 | High | ≥ 60% of observed days |
