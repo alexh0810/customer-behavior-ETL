@@ -21,7 +21,7 @@ The Streamlit dashboard is a complementary, interactive consumer of the same dat
 ### Search Stability vs Change
 
 **Visualization**
-![Search Stability](docs/search_stability.png)
+![Search Stability](search_stability.png)
 **Source: `mart_interest_change_summary`**
 **Query used**
 
@@ -56,7 +56,7 @@ The chart visualizes the percentage of users in each group.
 ### Interest Transition Patterns
 
 **Visualization**
-![Search Stability](docs/interest_transitions.png)
+![Search Stability](interest_transitions.png)
 
 **Source `mart_interest_change_summary`**
 
@@ -88,7 +88,7 @@ Each bar represents:
 ### Contract Engagement Levels
 
 **Visualization**
-![Search Stability](docs/contract_engagement.png)
+![Search Stability](contract_engagement.png)
 
 **Visualization**
 **Source `mart_contract_engagement`**
